@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-time Object Detection & Tracking</title>
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #ffffff;
+            background-image: url('https://asset.gecdesigns.com/img/wallpapers/beautiful-fantasy-wallpaper-ultra-hd-wallpaper-4k-sr10012418-1706506236698-cover.webp');
+            background-size: cover;
+            color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            flex-direction: column;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            color: #ffffff;
+            font-weight: bold;
+        }
+
+        .container {
+            background-color: #00000090;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            max-width: 1000px;
+            width: 100%;
+        }
+
+        .video-container {
+            display: flex;
+            justify-content: space-between;
+            gap: 20px;
+            margin-bottom: 1.5rem;
+        }
+
+        .video-box {
+            flex: 1;
+            background-color: #f0f0f0;
+            padding: 10px;
+            border-radius: 10px;
+            border: 3px solid #4a90e2;
+        }
+
+        video, canvas {
+            width: 100%;
+            border-radius: 10px;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+        }
+
+        button {
+            padding: 0.75rem 1.5rem;
+            font-size: 1rem;
+            font-weight: 600;
+            background-color: #4a90e2;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #357ABD;
+        }
+
+        button:disabled {
+            background-color: #aaa;
+            cursor: not-allowed;
+        }
+
+        @media (max-width: 768px) {
+            .video-container {
+                flex-direction: column;
+            }
+
+            button {
+                padding: 0.6rem 1rem;
+                font-size: 0.9rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>REAL TIME OBJECT DETECTION & TRACKING</h1>
+        
+        <div class="video-container">
+            <!-- Video Input Box -->
+            <div class="video-box">
+                <h3>Recording Video</h3>
+                <video id="videoInput" autoplay></video>
+            </div>
+
+            <!-- Canvas Output Box -->
+            <div class="video-box">
+                <h3>Detecting Video</h3>
+                <canvas id="canvasOutput"></canvas>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button id="startButton" onclick="startDetection()">Start Detection</button>
+            <button id="stopButton" onclick="stopDetection()" disabled>Stop Detection</button>
+        </div>
+    </div>
+
+    <script>
+        const video = document.getElementById('videoInput');
+        const canvas = document.getElementById('canvasOutput');
+        const context = canvas.getContext('2d');
+        let detectionStarted = false;
+        let detectionInterval;
+
+        // Access webcam
+        navigator.mediaDevices.getUserMedia({ video: true })
+        .then(stream => {
+            video.srcObject = stream;
+        })
+        .catch(error => {
+            console.error('Error accessing webcam: ', error);
+        });
+
+        // Start detection
+        function startDetection() {
+            if (detectionStarted) return;
+            detectionStarted = true;
+            document.getElementById('startButton').disabled = true;
+            document.getElementById('stopButton').disabled = false;
+            
+            detectionInterval = setInterval(sendFrame, 100); // Send frame every 100ms (10 FPS)
+        }
+
+        // Stop detection
+        function stopDetection() {
+            clearInterval(detectionInterval);
+            detectionStarted = false;
+            document.getElementById('startButton').disabled = false;
+            document.getElementById('stopButton').disabled = true;
+        }
+
+        // Send the video frame to the server for processing
+        function sendFrame() {
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = video.videoWidth;
+            tempCanvas.height = video.videoHeight;
+            const tempContext = tempCanvas.getContext('2d');
+            tempContext.drawImage(video, 0, 0, tempCanvas.width, tempCanvas.height);
+
+            const frameData = tempCanvas.toDataURL('image/jpeg');
+
+            fetch('/detect', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ frame: frameData })
+            })
+            .then(response => response.json())
+            .then(data => {
+                displayResult(data.result);
+            })
+            .catch(error => console.error('Error sending frame:', error));
+        }
+
+        // Display the result from server on the canvas
+        function displayResult(result) {
+            const img = new Image();
+            img.src = `data:image/jpeg;base64,${result}`;
+            img.onload = () => {
+                context.drawImage(img, 0, 0, canvas.width, canvas.height);
+            };
+        }
+
+    </script>
+
+</body>
+</html>
